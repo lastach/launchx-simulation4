@@ -1,6 +1,6 @@
 """
-Simulation #4: Go to Market & Early Traction
-LaunchX Entrepreneurship Simulation Suite
+Go to Market & Early Traction
+Entrepreneurship Simulation
 
 A resource-management game where the learner launches a product,
 allocates budget across channels, sets pricing, reacts to market
@@ -18,8 +18,8 @@ import streamlit as st
 # Page setup
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="LaunchX: Go to Market & Early Traction",
-    page_icon="ð",
+    page_title="Go to Market & Early Traction",
+    page_icon="🚀",
     layout="wide",
 )
 
@@ -866,7 +866,7 @@ def render_intro():
     name = st.text_input("Name", key="input_name", label_visibility="collapsed")
 
     if name:
-        if st.button("Let's Launch ð", key="btn_start"):
+        if st.button("Let's Launch 🚀", key="btn_start"):
             st.session_state.name = name
             st.session_state.stage = "choose_product"
             st.rerun()
