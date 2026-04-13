@@ -219,21 +219,21 @@ PRODUCTS = {
         "tagline": "Smart vents + app to eliminate hot/cold rooms",
         "base_price": 129,
         "target_customer": "Homeowners frustrated with uneven temperatures",
-        "icon": "ð ",
+        "icon": "🏠",
     },
     "landlord_energy": {
         "name": "ThermaLoop Pro",
         "tagline": "Sensor kit + portal for landlords to cut HVAC waste",
         "base_price": 199,
         "target_customer": "Small landlords managing 5 to 50 units",
-        "icon": "ð¢",
+        "icon": "🏢",
     },
     "installer_tools": {
         "name": "ThermaLoop Installer Kit",
         "tagline": "Pro diagnostic kit for HVAC airflow issues",
         "base_price": 349,
         "target_customer": "HVAC installers and contractors",
-        "icon": "ð§",
+        "icon": "🔧",
     },
 }
 
@@ -241,7 +241,7 @@ PRODUCTS = {
 CHANNELS = {
     "social_organic": {
         "name": "Social Media (Organic)",
-        "icon": "ð±",
+        "icon": "📱",
         "desc": "Post content on Instagram, TikTok, and Facebook. Small cash cost (tools, stock photos), heavy time commitment, slow to build.",
         "cost_per_week": 25,
         "time_investment": "High",
@@ -253,7 +253,7 @@ CHANNELS = {
     },
     "paid_social": {
         "name": "Paid Social Ads",
-        "icon": "ð°",
+        "icon": "💰",
         "desc": "Targeted ads on Facebook and Instagram. Fast reach, costs add up.",
         "cost_per_week": 350,
         "time_investment": "Low",
@@ -265,7 +265,7 @@ CHANNELS = {
     },
     "content_seo": {
         "name": "Content & SEO",
-        "icon": "ð",
+        "icon": "📝",
         "desc": "Blog posts, guides, and search optimization. Very slow start, compounds over time.",
         "cost_per_week": 100,
         "time_investment": "High",
@@ -277,7 +277,7 @@ CHANNELS = {
     },
     "cold_outreach": {
         "name": "Cold Email / DM Outreach",
-        "icon": "ð§",
+        "icon": "📧",
         "desc": "Direct messages to potential customers. Low cost, labor intensive, targeted.",
         "cost_per_week": 75,
         "time_investment": "Very High",
@@ -289,7 +289,7 @@ CHANNELS = {
     },
     "partnerships": {
         "name": "Partnerships & Referrals",
-        "icon": "ð¤",
+        "icon": "🤝",
         "desc": "Partner with complementary businesses. Slow to set up, high quality leads.",
         "cost_per_week": 150,
         "time_investment": "Medium",
@@ -301,7 +301,7 @@ CHANNELS = {
     },
     "trade_events": {
         "name": "Trade Shows & Events",
-        "icon": "ðª",
+        "icon": "🎪",
         "desc": "Attend industry events. Expensive but face to face trust building.",
         "cost_per_week": 500,
         "time_investment": "Medium",
@@ -313,7 +313,7 @@ CHANNELS = {
     },
     "influencer": {
         "name": "Influencer / Creator Collab",
-        "icon": "ð",
+        "icon": "🌟",
         "desc": "Partner with home improvement or HVAC creators. Bursty reach, hit or miss.",
         "cost_per_week": 300,
         "time_investment": "Low",
@@ -325,7 +325,7 @@ CHANNELS = {
     },
     "community": {
         "name": "Online Communities & Forums",
-        "icon": "ð¬",
+        "icon": "💬",
         "desc": "Engage in Reddit, niche forums, Facebook groups. Authentic but fragile.",
         "cost_per_week": 50,
         "time_investment": "High",
@@ -516,16 +516,16 @@ def get_milestones(product_key: str = None) -> List[Dict]:
     customer count thresholds but higher revenue targets."""
     is_b2b = product_key in ("installer_tools", "landlord_energy")
     return [
-        {"name": "First Sale", "target": 1, "metric": "total_sales", "points": 5, "icon": "ð"},
-        {"name": "10 Customers" if not is_b2b else "5 Customers", "target": 10 if not is_b2b else 5, "metric": "total_sales", "points": 10, "icon": "ð"},
-        {"name": "25 Customers" if not is_b2b else "15 Customers", "target": 25 if not is_b2b else 15, "metric": "total_sales", "points": 15, "icon": "ð¥"},
-        {"name": "50 Customers" if not is_b2b else "30 Customers", "target": 50 if not is_b2b else 30, "metric": "total_sales", "points": 20, "icon": "ð¥"},
-        {"name": "$1K Revenue Week", "target": 1000, "metric": "best_week_revenue", "points": 10, "icon": "ð°"},
-        {"name": "$5K Total Revenue" if not is_b2b else "$7K Total Revenue", "target": 5000 if not is_b2b else 7000, "metric": "total_revenue", "points": 15, "icon": "ð"},
-        {"name": "CAC Under $50" if not is_b2b else "CAC Under $100", "target": 50 if not is_b2b else 100, "metric": "cac_under", "points": 10, "icon": "ð¯"},
-        {"name": "Positive Unit Economics", "target": 1, "metric": "unit_econ_positive", "points": 15, "icon": "â"},
-        {"name": "3 Channels Tested", "target": 3, "metric": "channels_tested", "points": 5, "icon": "ð§ª"},
-        {"name": "Repeat Customer", "target": 1, "metric": "repeat_customers", "points": 15, "icon": "ð"},
+        {"name": "First Sale", "target": 1, "metric": "total_sales", "points": 5, "icon": "🎉"},
+        {"name": "10 Customers" if not is_b2b else "5 Customers", "target": 10 if not is_b2b else 5, "metric": "total_sales", "points": 10, "icon": "📈"},
+        {"name": "25 Customers" if not is_b2b else "15 Customers", "target": 25 if not is_b2b else 15, "metric": "total_sales", "points": 15, "icon": "🔥"},
+        {"name": "50 Customers" if not is_b2b else "30 Customers", "target": 50 if not is_b2b else 30, "metric": "total_sales", "points": 20, "icon": "💥"},
+        {"name": "$1K Revenue Week", "target": 1000, "metric": "best_week_revenue", "points": 10, "icon": "💰"},
+        {"name": "$5K Total Revenue" if not is_b2b else "$7K Total Revenue", "target": 5000 if not is_b2b else 7000, "metric": "total_revenue", "points": 15, "icon": "🏆"},
+        {"name": "CAC Under $50" if not is_b2b else "CAC Under $100", "target": 50 if not is_b2b else 100, "metric": "cac_under", "points": 10, "icon": "🎯"},
+        {"name": "Positive Unit Economics", "target": 1, "metric": "unit_econ_positive", "points": 15, "icon": "✅"},
+        {"name": "3 Channels Tested", "target": 3, "metric": "channels_tested", "points": 5, "icon": "🧪"},
+        {"name": "Repeat Customer", "target": 1, "metric": "repeat_customers", "points": 15, "icon": "🔄"},
     ]
 
 # Default for initial use
@@ -841,7 +841,7 @@ def generate_weekly_narrative(result: Dict) -> str:
 def render_intro():
     st.markdown("""
     <div class="game-header">
-        <h1>ð Go to Market & Early Traction</h1>
+        <h1>🚀 Go to Market & Early Traction</h1>
         <p>You have built your product. Now it is time to find your first real customers.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -875,7 +875,7 @@ def render_intro():
 def render_choose_product():
     st.markdown("""
     <div class="game-header">
-        <h1>ð¦ Choose Your Product</h1>
+        <h1>📦 Choose Your Product</h1>
         <p>Which ThermaLoop variant are you taking to market?</p>
     </div>
     """, unsafe_allow_html=True)
@@ -905,7 +905,7 @@ def render_choose_strategy():
     product = get_product()
     st.markdown(f"""
     <div class="game-header">
-        <h1>ð¯ Set Your Launch Strategy</h1>
+        <h1>🎯 Set Your Launch Strategy</h1>
         <p>Launching {product['name']}. Choose your pricing and messaging approach.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -951,7 +951,7 @@ def render_choose_strategy():
         """, unsafe_allow_html=True)
 
     st.markdown("")
-    if st.button("Lock In Strategy & Start Week 1 ð", key="btn_lock_strategy"):
+    if st.button("Lock In Strategy & Start Week 1 🔒", key="btn_lock_strategy"):
         st.session_state.pricing_key = pricing_choice
         st.session_state.messaging_key = messaging_choice
         st.session_state.stage = "weekly_play"
@@ -970,7 +970,7 @@ def render_weekly_play():
     if ss.budget < WEEKLY_BURN:
         st.markdown(f"""
         <div class="game-header" style="background: linear-gradient(135deg, #EF4444 0%, #DC2626 100%);">
-            <h1>ð¸ Runway Exhausted</h1>
+            <h1>💸 Runway Exhausted</h1>
             <p>You have ${ss.budget:,.0f} left but need ${WEEKLY_BURN} per week for fixed costs. Your launch window is over.</p>
         </div>
         """, unsafe_allow_html=True)
@@ -984,7 +984,7 @@ def render_weekly_play():
         </div>
         """, unsafe_allow_html=True)
         st.markdown("")
-        if st.button("See Final Results ð", key="btn_forced_end"):
+        if st.button("See Final Results 🏁", key="btn_forced_end"):
             ss.stage = "results"
             st.rerun()
         return
@@ -1089,10 +1089,10 @@ def render_weekly_play():
                     st.success(f"{m['icon']} Milestone unlocked: **{m['name']}** (+{m['points']} pts)")
 
     # Milestones tracker
-    with st.expander("ð Milestones", expanded=False):
+    with st.expander("🏆 Milestones", expanded=False):
         for m in active_milestones():
             hit = m["name"] in ss.milestones_hit
-            status = "â" if hit else "â¬"
+            status = "✅" if hit else "⬜"
             st.markdown(f"{status} {m['icon']} **{m['name']}** (+{m['points']} pts)")
 
     st.markdown("---")
@@ -1109,7 +1109,7 @@ def render_weekly_play():
     ch_cols = st.columns(2)
     for i, (ch_key, ch) in enumerate(CHANNELS.items()):
         with ch_cols[i % 2]:
-            fit = "ð¢ Great fit" if ss.product_key in ch.get("best_for", []) else "ð¡ Decent fit"
+            fit = "🟢 Great fit" if ss.product_key in ch.get("best_for", []) else "🟡 Decent fit"
             consecutive = 0
             history = ss.channel_history.get(ch_key, [])
             for w in range(week - 1, 0, -1):
@@ -1151,7 +1151,7 @@ def render_weekly_play():
             st.error("Over budget! Deselect some channels.")
 
         if st.button(
-            f"Run Week {week} â¶ï¸",
+            f"Run Week {week} ▶️",
             key=f"btn_run_week_{week}",
             disabled=not can_proceed or len(selected_channels) == 0,
         ):
@@ -1159,7 +1159,7 @@ def render_weekly_play():
             st.rerun()
 
     # Option to pivot strategy
-    with st.expander("ð Pivot Strategy (costs momentum)", expanded=False):
+    with st.expander("🔄 Pivot Strategy (costs momentum)", expanded=False):
         st.markdown("*Changing your pricing or messaging mid-launch costs you a week of channel momentum.*")
         new_pricing = st.selectbox(
             "Change pricing",
@@ -1176,7 +1176,7 @@ def render_weekly_play():
             key=f"pivot_messaging_{week}",
         )
         if new_pricing != ss.pricing_key or new_messaging != ss.messaging_key:
-            if st.button("Confirm Pivot ð", key=f"btn_pivot_{week}"):
+            if st.button("Confirm Pivot 🔄", key=f"btn_pivot_{week}"):
                 ss.pricing_key = new_pricing
                 ss.messaging_key = new_messaging
                 ss.pivot_count += 1
@@ -1244,7 +1244,7 @@ def render_market_event(event):
     </div>
     """, unsafe_allow_html=True)
 
-    icon = "â¡" if event_type == "negative" else "ð" if event_type == "positive" else "ð¢"
+    icon = "⚡" if event_type == "negative" else "🌟" if event_type == "positive" else "📢"
 
     st.markdown(f"""
     <div class="event-card {css_class}">
@@ -1314,7 +1314,7 @@ def render_results():
 
     st.markdown(f"""
     <div class="game-header">
-        <h1>ð Launch Complete!</h1>
+        <h1>🏁 Launch Complete!</h1>
         <p>Here are your 6-week go-to-market results for {product['name']}.</p>
     </div>
     """, unsafe_allow_html=True)
@@ -1385,23 +1385,23 @@ def render_results():
     st.markdown("---")
 
     # Milestones
-    st.markdown("##### ð Milestones")
+    st.markdown("##### 🏆 Milestones")
     col_hit, col_miss = st.columns(2)
     with col_hit:
         st.markdown("**Achieved:**")
         for m in active_milestones():
             if m["name"] in ss.milestones_hit:
-                st.markdown(f"â {m['icon']} {m['name']} (+{m['points']})")
+                st.markdown(f"✅ {m['icon']} {m['name']} (+{m['points']})")
     with col_miss:
         st.markdown("**Missed:**")
         for m in active_milestones():
             if m["name"] not in ss.milestones_hit:
-                st.markdown(f"â¬ {m['icon']} {m['name']} (+{m['points']})")
+                st.markdown(f"⬜ {m['icon']} {m['name']} (+{m['points']})")
 
     st.markdown("---")
 
     # Week by week trend
-    st.markdown("##### ð Weekly Trend")
+    st.markdown("##### 📊 Weekly Trend")
     if ss.weekly_results:
         df = pd.DataFrame([
             {
@@ -1422,7 +1422,7 @@ def render_results():
     st.markdown("---")
 
     # Propensity insights
-    st.markdown("##### ð What This Reveals About You")
+    st.markdown("##### 🔍 What This Reveals About You")
 
     insights = generate_insights()
     for insight in insights:
@@ -1436,7 +1436,7 @@ def render_results():
     st.markdown("---")
 
     # Actionable takeaways
-    st.markdown("##### ð¯ Your Real World Action Items")
+    st.markdown("##### 🎯 Your Real World Action Items")
     actions = generate_actions()
     for i, action in enumerate(actions, 1):
         st.markdown(f"""
@@ -1448,21 +1448,9 @@ def render_results():
 
     st.markdown("---")
 
-    # Email capture
-    st.markdown("##### Keep Building")
-    st.markdown("Get personalized follow-up resources based on your simulation results.")
-    email_col1, email_col2 = st.columns([2, 1])
-    with email_col1:
-        email = st.text_input("Email", key="input_email", label_visibility="collapsed", placeholder="your@email.com")
-    with email_col2:
-        if st.button("Send My Results ð¬", key="btn_email"):
-            if email:
-                ss.email = email
-                st.success(f"Results saved! Check your inbox for personalized next steps.")
-
     # Restart
     st.markdown("")
-    if st.button("Play Again ð", key="btn_restart"):
+    if st.button("🔄 Play Again", key="btn_restart"):
         for key in list(st.session_state.keys()):
             del st.session_state[key]
         st.rerun()
