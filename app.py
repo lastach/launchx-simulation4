@@ -756,6 +756,22 @@ def simulate_week(spend_by_channel: Dict[str, float]) -> Dict[str, Any]:
     channel_results = {}
     active_channels = [k for k, v in spend_by_channel.items() if v > 0]
 
+    # --- Channel conflict / clutter detection ---------------------------------
+    # When 2+ active channels both target the current product_key in their
+    # best_for list, they compete for the same audience's attention. Each
+    # conflicting channel takes a 0.85x reach multiplier per *additional*
+    # overlapping channel (capped to 2 overlaps for 0.72x floor). This models
+    # real-world message-clutter and attention competition within a segment.
+    on_target_channels = [
+        k for k in active_channels
+        if product_key in CHANNELS[k].get("best_for", [])
+    ]
+    n_on_target = len(on_target_channels)
+    conflict_multiplier = 1.0
+    if n_on_target >= 2:
+        extra = min(2, n_on_target - 1)
+        conflict_multiplier = 0.85 ** extra  # 2 overlaps→0.85, 3+→0.7225
+
     for ch_key in active_channels:
         ch = CHANNELS[ch_key]
         spend = float(spend_by_channel[ch_key])
@@ -775,8 +791,24 @@ def simulate_week(spend_by_channel: Dict[str, float]) -> Dict[str, Any]:
         # Base reach with ramp + spend scaling
         reach = ch["base_reach"] * (1 + ch["ramp_bonus"] * consecutive) * scale
 
+        # --- Audience saturation / CAC inflation -----------------------------
+        # After 3 consecutive weeks on the same channel, the addressable
+        # audience inside that channel's niche starts to fatigue. Effective
+        # reach decays 1/1.05^(consecutive-3) per extra week, which inflates
+        # CAC by ~5% compounding. Learners who camp on one channel forever
+        # see rising CAC and falling lead quality — forcing real channel-mix
+        # and test-and-rotate discipline.
+        saturation_penalty = 1.0
+        if consecutive > 3:
+            saturation_penalty = 1.0 / (1.05 ** (consecutive - 3))
+            reach = reach * saturation_penalty
+
         # Channel fit bonus (strong penalty for misfit)
         fit_bonus = 1.3 if product_key in ch.get("best_for", []) else 0.6
+
+        # Clutter penalty when multiple on-target channels compete
+        if ch_key in on_target_channels:
+            reach = reach * conflict_multiplier
 
         # Messaging resonance
         msg_resonance = messaging.get("resonance", {}).get(product_key, 1.0)
@@ -805,6 +837,10 @@ def simulate_week(spend_by_channel: Dict[str, float]) -> Dict[str, Any]:
             "conv_rate": conv,
             "cac": spend / max(leads, 1),
             "saturation": min(1.0, spend_ratio / 3.0),
+            "consecutive_weeks": consecutive,
+            "audience_fatigue": round(1.0 - saturation_penalty, 3),
+            "clutter_penalty": (round(1.0 - conflict_multiplier, 3)
+                                if ch_key in on_target_channels else 0.0),
         }
 
     # Apply sales cap if active
@@ -1186,12 +1222,28 @@ def render_weekly_play():
                     roi_pct = ((attributed_gp - cr["cost"]) / ch_cost) * 100 if cr["cost"] > 0 else (attributed_gp * 100 if attributed_gp > 0 else 0)
                     roi_color = "#10B981" if roi_pct >= 0 else "#EF4444"
                     roi_display = f"<span style='color:{roi_color};font-weight:600;'>{roi_pct:+.0f}%</span>"
+                    fatigue = cr.get("audience_fatigue", 0.0)
+                    clutter = cr.get("clutter_penalty", 0.0)
+                    cons = cr.get("consecutive_weeks", 0)
+                    warnings = []
+                    if fatigue >= 0.05:
+                        warnings.append(
+                            f"<span style='color:#F59E0B;'>⚠️ audience fatigue -{fatigue*100:.0f}% "
+                            f"({cons}w in a row)</span>"
+                        )
+                    if clutter >= 0.10:
+                        warnings.append(
+                            f"<span style='color:#F59E0B;'>⚠️ message clutter -{clutter*100:.0f}% "
+                            f"(competing on-target channels)</span>"
+                        )
+                    warn_str = (" | " + " | ".join(warnings)) if warnings else ""
                     st.markdown(
                         f"{ch['icon']} **{ch['name']}**: "
                         f"Reach {cr['reach']:,} | Leads {cr['leads']} | "
                         f"Conv {cr['conv_rate']*100:.1f}% | "
                         f"CAC {ch_cac_display} | "
-                        f"ROI {roi_display}",
+                        f"ROI {roi_display}"
+                        f"{warn_str}",
                         unsafe_allow_html=True
                     )
 
