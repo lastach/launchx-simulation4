@@ -1579,7 +1579,7 @@ def render_results():
         st.markdown(
             "We model LTV as **3× contribution margin per first sale** as a proxy for repeat purchase + referral. "
             "This is a **hardware/durable-goods heuristic**; a fuller SaaS formula is "
-            "`LTV = ARPA × gross_margin / churn` (Skok, 2012). "
+            "`LTV = ARPA × gross_margin / churn`. "
             "For HVAC retrofits the true LTV depends on warranty attach, "
             "service contracts, and referral rate — three levers your Round-1 learners should quantify "
             "before a Series A raise. The 3× multiple is deliberately conservative: sufficient to "
@@ -1736,18 +1736,18 @@ def render_results():
 
     st.markdown("---")
 
-    # Named theoretical grounding
-    st.markdown("##### 📚 Theoretical grounding")
+    # Principles the mechanics enforced
+    st.markdown("##### What the mechanics enforced")
     st.markdown(
-        "- **Crossing the Chasm (Moore, 1991):** Your GTM motion is tested against an *early-adopter* "
-        "segment. Winning this phase requires **niche focus**, not breadth — the classic chasm failure is "
-        "firing channel tactics at a broad market before a beachhead is won.\n"
-        "- **SaaS Unit-Economics (Skok, 2012):** The LTV:CAC ≥ 3 and payback < 12 month thresholds above are "
-        "the Bessemer/Skok benchmarks. Below 1.5, growth is *value-destructive*; between 1.5 and 3, the "
-        "business is survivable but not institutionally fundable.\n"
-        "- **Pirate Metrics — AARRR (McClure, 2007):** Your six-week play covered Acquisition, Activation, "
-        "and Revenue. A complete funnel adds Retention and Referral — the two metrics this sim treats as a "
-        "flat 3× multiple. In real GTM, retention is where channels are won or lost."
+        "- **Early-adopter focus beats breadth.** Your GTM motion was tested against a specific "
+        "early-adopter segment. The classic failure is firing channel tactics at a broad market "
+        "before a beachhead is won.\n"
+        "- **Unit-economics thresholds gate funding.** LTV:CAC ≥ 3 and payback < 12 months is the "
+        "default institutional diligence screen. Below 1.5, growth is *value-destructive*; between "
+        "1.5 and 3, the business is survivable but not fundable at priced-round terms.\n"
+        "- **Retention is where channels are won or lost.** This sim collapses retention and referral "
+        "into a flat 3× multiple. In real GTM, a 10% retention improvement compounds across cohorts "
+        "and moves LTV:CAC more than most acquisition tactics."
     )
 
     st.markdown("---")
