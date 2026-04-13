@@ -242,8 +242,8 @@ CHANNELS = {
     "social_organic": {
         "name": "Social Media (Organic)",
         "icon": "ð±",
-        "desc": "Post content on Instagram, TikTok, and Facebook. Free but slow to build.",
-        "cost_per_week": 0,
+        "desc": "Post content on Instagram, TikTok, and Facebook. Small cash cost (tools, stock photos), heavy time commitment, slow to build.",
+        "cost_per_week": 25,
         "time_investment": "High",
         "base_reach": 120,
         "base_conv": 0.012,
@@ -852,9 +852,10 @@ def render_intro():
     Your ThermaLoop product is ready to ship. You have validated the problem, tested your assumptions, and
     built an MVP. Now comes the real test: can you get paying customers?
     <br><br>
-    You have <strong>$2,500</strong> in marketing budget and <strong>6 weeks</strong> to hit as many traction
-    milestones as possible. Each week, you will choose which marketing channels to activate, react to
-    market events, and watch your metrics evolve.
+    You start with <strong>$2,500</strong> in marketing budget and <strong>6 weeks</strong> to hit as many
+    traction milestones as possible. Each week, you choose which marketing channels to activate, react to
+    market events, and watch your metrics evolve. <strong>Profits from sales go back into your budget</strong>,
+    so strong early weeks give you more runway to invest later.
     <br><br>
     <strong>Your goal:</strong> Maximize customers, revenue, and learning while keeping your unit economics healthy.
     Every dollar counts. Every channel choice matters. Every pivot has a cost.
@@ -862,14 +863,10 @@ def render_intro():
     """, unsafe_allow_html=True)
 
     st.markdown("")
-    st.markdown("##### What is your name?")
-    name = st.text_input("Name", key="input_name", label_visibility="collapsed")
-
-    if name:
-        if st.button("Let's Launch 🚀", key="btn_start"):
-            st.session_state.name = name
-            st.session_state.stage = "choose_product"
-            st.rerun()
+    if st.button("Let's Launch 🚀", key="btn_start", type="primary"):
+        st.session_state.name = "Founder"
+        st.session_state.stage = "choose_product"
+        st.rerun()
 
 
 # ---------------------------------------------------------------------------
@@ -1052,17 +1049,28 @@ def render_weekly_play():
             with rc4:
                 st.metric("Revenue", f"${last['revenue']:,.0f}")
 
-            # Channel breakdown
+            # Channel breakdown with ROI
             if last["channel_results"]:
                 st.markdown("**Channel Breakdown:**")
+                # Allocate revenue proportionally by leads for per-channel ROI
+                total_wk_leads = max(1, sum(cr["leads"] for cr in last["channel_results"].values()))
+                wk_gross_profit = last["revenue"] * last.get("margin", 0.5)
                 for ch_key, cr in last["channel_results"].items():
                     ch = CHANNELS[ch_key]
                     ch_cac_display = f"${cr['cac']:,.0f}" if cr['leads'] > 0 else "N/A"
+                    # Revenue attribution: share of gross profit proportional to leads
+                    attributed_gp = wk_gross_profit * (cr["leads"] / total_wk_leads)
+                    ch_cost = max(1, cr["cost"])
+                    roi_pct = ((attributed_gp - cr["cost"]) / ch_cost) * 100 if cr["cost"] > 0 else (attributed_gp * 100 if attributed_gp > 0 else 0)
+                    roi_color = "#10B981" if roi_pct >= 0 else "#EF4444"
+                    roi_display = f"<span style='color:{roi_color};font-weight:600;'>{roi_pct:+.0f}%</span>"
                     st.markdown(
                         f"{ch['icon']} **{ch['name']}**: "
                         f"Reach {cr['reach']:,} | Leads {cr['leads']} | "
                         f"Conv {cr['conv_rate']*100:.1f}% | "
-                        f"CAC {ch_cac_display}"
+                        f"CAC {ch_cac_display} | "
+                        f"ROI {roi_display}",
+                        unsafe_allow_html=True
                     )
 
             # Show newly hit milestones
@@ -1182,7 +1190,10 @@ def run_week(selected_channels, total_cost):
     ss = st.session_state
 
     result = simulate_week(selected_channels)
+    # Apply weekly cashflow: subtract all costs, add gross profit from sales (revenue * margin).
+    # This models profit reinvestment — successful launches build a bigger budget.
     ss.budget -= total_cost
+    ss.budget += result["revenue"] * result["margin"]
     ss.total_sales += result["sales"] + result["repeat_sales"]
     ss.total_revenue += result["revenue"]
     ss.total_ad_spend += total_cost - WEEKLY_BURN
@@ -1304,7 +1315,7 @@ def render_results():
     st.markdown(f"""
     <div class="game-header">
         <h1>ð Launch Complete!</h1>
-        <p>{ss.name}, here are your 6-week go-to-market results for {product['name']}.</p>
+        <p>Here are your 6-week go-to-market results for {product['name']}.</p>
     </div>
     """, unsafe_allow_html=True)
 
