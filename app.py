@@ -1574,6 +1574,18 @@ def render_results():
         verdict = "⚫ **Not enough customers to compute unit economics.** You did not reach a sample size to learn from."
     st.markdown(f"<div class='insight-box'>{verdict}</div>", unsafe_allow_html=True)
 
+    # LTV assumption explanation (transparency / tooltip)
+    with st.expander("Why LTV = 3× contribution margin?"):
+        st.markdown(
+            "We model LTV as **3× contribution margin per first sale** as a proxy for repeat purchase + referral. "
+            "This is a **hardware/durable-goods heuristic**; a fuller SaaS formula is "
+            "`LTV = ARPA × gross_margin / churn` (Skok, 2012). "
+            "For HVAC retrofits the true LTV depends on warranty attach, "
+            "service contracts, and referral rate — three levers your Round-1 learners should quantify "
+            "before a Series A raise. The 3× multiple is deliberately conservative: sufficient to "
+            "distinguish healthy from negative unit economics, without over-rewarding one-time transactions."
+        )
+
     st.markdown("")
 
     # Score calculation
@@ -1690,6 +1702,53 @@ def render_results():
             {action['text']}
         </div>
         """, unsafe_allow_html=True)
+
+    st.markdown("---")
+
+    # Messaging-to-channel fit analysis
+    st.markdown("##### 🧭 Messaging-to-channel fit")
+    msg_angle = ss.messaging.get("angle") if hasattr(ss, "messaging") and ss.messaging else None
+    paid_spend = sum(r.get("channel_results", {}).get(ch, {}).get("spend", 0)
+                     for r in ss.weekly_results
+                     for ch in CHANNELS
+                     if CHANNELS.get(ch, {}).get("cost_per_week", 0) > 0)
+    organic_weeks = sum(1 for r in ss.weekly_results
+                        for ch in r.get("channel_results", {})
+                        if CHANNELS.get(ch, {}).get("cost_per_week", 0) == 0)
+    fit_notes = []
+    if msg_angle == "business_roi":
+        fit_notes.append("Your **business-ROI messaging** pairs strongly with **outbound/paid** channels "
+                         "(cold email, Google Ads, LinkedIn) — decision-makers search with cost/benefit language.")
+        if paid_spend < 500:
+            fit_notes.append("⚠️ You ran ROI messaging on almost no paid distribution. ROI-framed copy needs "
+                             "volume to find the buyer. Consider pairing this angle with ≥ $1K/week in paid next round.")
+    elif msg_angle == "technical_spec":
+        fit_notes.append("Your **technical-spec messaging** pairs with **content/community** channels "
+                         "(trade forums, SEO long-tail, spec sheets) where installers self-educate.")
+    elif msg_angle == "comfort_lifestyle":
+        fit_notes.append("Your **comfort/lifestyle messaging** pairs with **referral + social** channels — "
+                         "the buyer is emotional, and social proof compounds faster than cold outreach here.")
+    if not fit_notes:
+        fit_notes.append("No dominant messaging angle detected. In real GTM, a crisp angle plus a matched "
+                         "channel is worth more than five channels with a generic pitch.")
+    for n in fit_notes:
+        st.markdown(f"- {n}")
+
+    st.markdown("---")
+
+    # Named theoretical grounding
+    st.markdown("##### 📚 Theoretical grounding")
+    st.markdown(
+        "- **Crossing the Chasm (Moore, 1991):** Your GTM motion is tested against an *early-adopter* "
+        "segment. Winning this phase requires **niche focus**, not breadth — the classic chasm failure is "
+        "firing channel tactics at a broad market before a beachhead is won.\n"
+        "- **SaaS Unit-Economics (Skok, 2012):** The LTV:CAC ≥ 3 and payback < 12 month thresholds above are "
+        "the Bessemer/Skok benchmarks. Below 1.5, growth is *value-destructive*; between 1.5 and 3, the "
+        "business is survivable but not institutionally fundable.\n"
+        "- **Pirate Metrics — AARRR (McClure, 2007):** Your six-week play covered Acquisition, Activation, "
+        "and Revenue. A complete funnel adds Retention and Referral — the two metrics this sim treats as a "
+        "flat 3× multiple. In real GTM, retention is where channels are won or lost."
+    )
 
     st.markdown("---")
 
