@@ -565,8 +565,8 @@ def init_state():
         "quality_modifier": 0.0,
         "sales_cap": None,
         "pivot_count": 0,
+        "spend_by_channel": {},  # week -> {channel: dollars}
         "name": "",
-        "email": "",
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -634,8 +634,112 @@ def check_milestones():
     return newly_hit
 
 
-def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
-    """Run one week of go-to-market simulation."""
+def project_channel(ch_key: str, spend: float, week: int = None) -> Dict[str, Any]:
+    """Deterministic projection of a channel's funnel at a given spend level.
+    Uses diminishing-returns scaling: reach ~ spend^0.7 relative to base cost.
+    No randomness — for live preview before running the week.
+    """
+    ss = st.session_state
+    ch = CHANNELS[ch_key]
+    base_cost = max(ch["cost_per_week"], 1)
+    if spend <= 0:
+        return {"spend": 0, "reach": 0, "leads": 0, "sales": 0, "cac": 0,
+                "conv_rate": 0, "saturation": 0}
+
+    # Spend ratio with diminishing returns
+    spend_ratio = spend / base_cost
+    # saturation: once spend > 3x base, returns flatten hard
+    scale = spend_ratio ** 0.7
+
+    product_key = ss.product_key
+    week = week or ss.week
+    history = ss.channel_history.get(ch_key, [])
+    consecutive = 0
+    for w in range(week - 1, 0, -1):
+        if w in history:
+            consecutive += 1
+        else:
+            break
+
+    reach_raw = ch["base_reach"] * (1 + ch["ramp_bonus"] * consecutive) * scale
+    fit_bonus = 1.3 if product_key in ch.get("best_for", []) else 0.6
+    reach = int(reach_raw * fit_bonus * ss.reach_modifier)
+
+    pricing = get_pricing() or {"conv_boost": 1.0, "margin": 0.5, "multiplier": 1.0}
+    messaging = get_messaging() or {"resonance": {}}
+    msg_resonance = messaging.get("resonance", {}).get(product_key, 1.0)
+    conv = ch["base_conv"] * pricing.get("conv_boost", 1.0) * msg_resonance * ss.conv_modifier
+    conv = max(0.001, min(conv, 0.15))
+    leads = int(reach * conv)
+
+    # Expected close rate ~0.65 (mean of 0.5-0.8)
+    avg_quality = ch["quality"] + ss.quality_modifier
+    close_rate = 0.65 * min(avg_quality, 1.2)
+    sales = int(leads * close_rate)
+
+    saturation = min(1.0, spend_ratio / 3.0)  # 0-1, how saturated the channel is
+    cac = spend / max(sales, 1) if sales > 0 else spend  # spend / projected sales
+
+    return {
+        "spend": spend, "reach": reach, "leads": leads,
+        "sales": sales, "cac": cac, "conv_rate": conv,
+        "saturation": saturation,
+    }
+
+
+def project_week(spend_by_channel: Dict[str, float]) -> Dict[str, Any]:
+    """Project full-funnel outcomes for a week given spend per channel.
+    Deterministic — for live UI preview."""
+    ss = st.session_state
+    total_spend = sum(spend_by_channel.values()) + WEEKLY_BURN
+    total_reach = 0
+    total_leads = 0
+    total_sales = 0
+    per_channel = {}
+    for ch_key, spend in spend_by_channel.items():
+        if spend <= 0:
+            continue
+        proj = project_channel(ch_key, spend)
+        per_channel[ch_key] = proj
+        total_reach += proj["reach"]
+        total_leads += proj["leads"]
+        total_sales += proj["sales"]
+
+    price = calculate_effective_price()
+    margin = (get_pricing() or {}).get("margin", 0.5) * ss.margin_modifier
+    revenue = total_sales * price
+    gross_profit = revenue * margin
+    ad_spend = sum(spend_by_channel.values())
+    cac = ad_spend / total_sales if total_sales > 0 else 0
+    # LTV: assume 3x-equivalent value (repeat + referral); margin-adjusted
+    ltv = price * margin * 3.0
+    payback_months = (cac / (price * margin)) if (price * margin) > 0 and cac > 0 else 0
+    ltv_cac = (ltv / cac) if cac > 0 else 0
+
+    return {
+        "per_channel": per_channel,
+        "total_spend": total_spend,
+        "ad_spend": ad_spend,
+        "total_reach": total_reach,
+        "total_leads": total_leads,
+        "projected_sales": total_sales,
+        "projected_revenue": revenue,
+        "projected_gross_profit": gross_profit,
+        "cac": cac,
+        "ltv": ltv,
+        "ltv_cac": ltv_cac,
+        "payback_months": payback_months,
+    }
+
+
+def simulate_week(spend_by_channel: Dict[str, float]) -> Dict[str, Any]:
+    """Run one week of go-to-market simulation with real funnel math.
+
+    spend_by_channel: {channel_key: dollars_spent_this_week}. Channels with
+    spend > 0 are active. Reach scales with spend^0.7 (diminishing returns),
+    so doubling spend does NOT double reach — learners must grapple with
+    channel saturation.
+    """
     ss = st.session_state
     rng = random.Random(ss.rng_seed + ss.week * 137)
 
@@ -648,11 +752,16 @@ def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
     total_reach = 0
     total_leads = 0
     total_cost = WEEKLY_BURN
+    total_ad_spend = 0.0
     channel_results = {}
+    active_channels = [k for k, v in spend_by_channel.items() if v > 0]
 
     for ch_key in active_channels:
         ch = CHANNELS[ch_key]
-        cost = ch["cost_per_week"]
+        spend = float(spend_by_channel[ch_key])
+        base_cost = max(ch["cost_per_week"], 1)
+        spend_ratio = spend / base_cost
+        scale = spend_ratio ** 0.7  # diminishing returns
 
         # Calculate consecutive weeks for ramp bonus
         history = ss.channel_history.get(ch_key, [])
@@ -663,8 +772,8 @@ def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
             else:
                 break
 
-        # Base reach with ramp
-        reach = ch["base_reach"] * (1 + ch["ramp_bonus"] * consecutive)
+        # Base reach with ramp + spend scaling
+        reach = ch["base_reach"] * (1 + ch["ramp_bonus"] * consecutive) * scale
 
         # Channel fit bonus (strong penalty for misfit)
         fit_bonus = 1.3 if product_key in ch.get("best_for", []) else 0.6
@@ -672,7 +781,7 @@ def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
         # Messaging resonance
         msg_resonance = messaging.get("resonance", {}).get(product_key, 1.0)
 
-        # Apply modifiers
+        # Apply modifiers with randomness
         reach = reach * fit_bonus * ss.reach_modifier
         reach = int(reach * rng.uniform(0.75, 1.25))
 
@@ -686,14 +795,16 @@ def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
 
         total_reach += reach
         total_leads += leads
-        total_cost += cost
+        total_cost += spend
+        total_ad_spend += spend
 
         channel_results[ch_key] = {
             "reach": reach,
             "leads": leads,
-            "cost": cost,
+            "cost": spend,
             "conv_rate": conv,
-            "cac": cost / max(leads, 1),
+            "cac": spend / max(leads, 1),
+            "saturation": min(1.0, spend_ratio / 3.0),
         }
 
     # Apply sales cap if active
@@ -725,6 +836,12 @@ def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
     email_signups = int((total_leads - sales) * rng.uniform(0.2, 0.5))
     email_signups = max(0, email_signups)
 
+    # Compute week-level CAC, LTV, payback
+    week_cac = total_ad_spend / sales if sales > 0 else 0
+    week_ltv = price * margin * 3.0  # 3x contribution-margin dollars
+    week_ltv_cac = (week_ltv / week_cac) if week_cac > 0 else 0
+    week_payback = (week_cac / (price * margin)) if (price * margin) > 0 and week_cac > 0 else 0
+
     result = {
         "week": ss.week,
         "channels": active_channels,
@@ -735,7 +852,12 @@ def simulate_week(active_channels: List[str]) -> Dict[str, Any]:
         "repeat_sales": repeat,
         "revenue": revenue,
         "total_cost": total_cost,
+        "ad_spend": total_ad_spend,
         "gross_profit": gross_profit,
+        "week_cac": week_cac,
+        "week_ltv": week_ltv,
+        "week_ltv_cac": week_ltv_cac,
+        "week_payback_months": week_payback,
         "margin": margin,
         "email_signups": email_signups,
         "close_rate": close_rate,
@@ -1097,19 +1219,24 @@ def render_weekly_play():
 
     st.markdown("---")
 
-    # Channel selection
-    st.markdown("##### Choose Your Channels This Week")
-    st.markdown("*Select which marketing channels to activate. Each has a weekly cost.*")
+    # Channel allocation — per-channel spend sliders
+    st.markdown("##### Allocate Your Weekly Channel Budget")
+    st.markdown(
+        "*Move the sliders to set how much to spend on each channel this week. "
+        "Doubling spend does not double reach — each channel has diminishing returns past its "
+        "base cost, so you have to pick your bets. $0 means the channel is off.*"
+    )
 
     available_budget = ss.budget - WEEKLY_BURN
-    selected_channels = []
-    total_channel_cost = 0
+    spend_by_channel: Dict[str, float] = {}
+    total_channel_spend = 0.0
 
-    # Display channels in a grid
+    # Build sliders in a grid
     ch_cols = st.columns(2)
     for i, (ch_key, ch) in enumerate(CHANNELS.items()):
         with ch_cols[i % 2]:
             fit = "🟢 Great fit" if ss.product_key in ch.get("best_for", []) else "🟡 Decent fit"
+            base_cost = ch["cost_per_week"]
             consecutive = 0
             history = ss.channel_history.get(ch_key, [])
             for w in range(week - 1, 0, -1):
@@ -1117,30 +1244,108 @@ def render_weekly_play():
                     consecutive += 1
                 else:
                     break
-            ramp_note = f" (Week {consecutive+1} momentum)" if consecutive > 0 else ""
-            can_afford = ch["cost_per_week"] <= (available_budget - total_channel_cost)
-            cost_label = "(Free)" if ch["cost_per_week"] == 0 else f"(${ch['cost_per_week']}/wk)"
-            is_checked = st.checkbox(
-                f"{ch['icon']} **{ch['name']}** {cost_label} {ramp_note}",
-                key=f"ch_{ch_key}_{week}",
-                disabled=not can_afford and ch["cost_per_week"] > 0,
+            ramp_note = f" · Week {consecutive+1} momentum" if consecutive > 0 else ""
+
+            # Slider range: $0 to 3x base cost (beyond 3x, saturation is extreme)
+            max_spend = int(max(base_cost * 3, 100))
+            step = 25 if base_cost <= 200 else 50
+            st.markdown(
+                f"**{ch['icon']} {ch['name']}** — base ${base_cost}/wk{ramp_note}",
+                help=f"{ch['desc']} | {fit}",
             )
-            st.markdown(f"<span style='font-size: 0.8rem; color: #6B7280;'>{ch['desc']} | {fit}</span>", unsafe_allow_html=True)
-            if is_checked:
-                selected_channels.append(ch_key)
-                total_channel_cost += ch["cost_per_week"]
+            slider_key = f"spend_{ch_key}_{week}"
+            default_val = int(base_cost) if st.session_state.get(slider_key) is None else int(st.session_state.get(slider_key, base_cost))
+            spend_val = st.slider(
+                label=f"spend-{ch_key}",
+                min_value=0,
+                max_value=max_spend,
+                value=default_val,
+                step=step,
+                key=slider_key,
+                label_visibility="collapsed",
+            )
+            if spend_val > 0:
+                spend_by_channel[ch_key] = float(spend_val)
+                total_channel_spend += spend_val
+            st.markdown(
+                f"<span style='font-size: 0.8rem; color: #6B7280;'>{fit} · {ch['desc']}</span>",
+                unsafe_allow_html=True,
+            )
 
     st.markdown("")
-    total_week_cost = total_channel_cost + WEEKLY_BURN
+    total_week_cost = total_channel_spend + WEEKLY_BURN
     remaining_after = ss.budget - total_week_cost
+
+    # Live funnel projection — updates as sliders move
+    proj = project_week(spend_by_channel)
+    active_count = len([v for v in spend_by_channel.values() if v > 0])
+
+    st.markdown("##### 🔬 Live Funnel Projection")
+    st.markdown(
+        "*Math updates as you move sliders. These are deterministic projections; "
+        "actual weekly results include ±25% variance.*"
+    )
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    with fc1:
+        st.metric("Projected Reach", f"{proj['total_reach']:,}")
+    with fc2:
+        st.metric("Projected Leads", f"{proj['total_leads']:,}")
+    with fc3:
+        st.metric("Projected Sales", f"{proj['projected_sales']:,}")
+    with fc4:
+        st.metric("Projected Revenue", f"${proj['projected_revenue']:,.0f}")
+
+    ec1, ec2, ec3 = st.columns(3)
+    with ec1:
+        cac_color = "#10B981" if 0 < proj["cac"] < 75 else "#F59E0B" if proj["cac"] < 150 else "#EF4444"
+        st.markdown(
+            f"<div style='text-align:center;'><div style='color:#6B7280;font-size:0.85rem;'>Projected CAC</div>"
+            f"<div style='color:{cac_color};font-size:1.4rem;font-weight:700;'>"
+            f"${proj['cac']:,.0f}" + ("" if proj['cac'] > 0 else " —") + "</div></div>",
+            unsafe_allow_html=True,
+        )
+    with ec2:
+        ratio = proj["ltv_cac"]
+        ratio_color = "#10B981" if ratio >= 3 else "#F59E0B" if ratio >= 1 else "#EF4444"
+        ratio_label = f"{ratio:.1f} : 1" if ratio > 0 else "—"
+        st.markdown(
+            f"<div style='text-align:center;'><div style='color:#6B7280;font-size:0.85rem;'>LTV : CAC</div>"
+            f"<div style='color:{ratio_color};font-size:1.4rem;font-weight:700;'>{ratio_label}</div></div>",
+            unsafe_allow_html=True,
+        )
+    with ec3:
+        pb = proj["payback_months"]
+        pb_color = "#10B981" if 0 < pb < 12 else "#F59E0B" if pb < 18 else "#EF4444"
+        pb_label = f"{pb:.1f} mo" if pb > 0 else "—"
+        st.markdown(
+            f"<div style='text-align:center;'><div style='color:#6B7280;font-size:0.85rem;'>Payback</div>"
+            f"<div style='color:{pb_color};font-size:1.4rem;font-weight:700;'>{pb_label}</div></div>",
+            unsafe_allow_html=True,
+        )
+
+    # Per-channel breakdown in expander
+    if active_count > 0:
+        with st.expander("Per-channel projection", expanded=False):
+            for ch_key, pdata in proj["per_channel"].items():
+                ch = CHANNELS[ch_key]
+                sat_pct = int(pdata["saturation"] * 100)
+                sat_color = "#10B981" if sat_pct < 50 else "#F59E0B" if sat_pct < 80 else "#EF4444"
+                ch_cac = f"${pdata['cac']:,.0f}" if pdata["sales"] > 0 else "—"
+                st.markdown(
+                    f"{ch['icon']} **{ch['name']}** — ${pdata['spend']:,.0f} spend → "
+                    f"{pdata['reach']:,} reach → {pdata['leads']:,} leads → {pdata['sales']:,} sales "
+                    f"| CAC {ch_cac} "
+                    f"| saturation <span style='color:{sat_color};font-weight:600;'>{sat_pct}%</span>",
+                    unsafe_allow_html=True,
+                )
 
     col_summary, col_action = st.columns([2, 1])
     with col_summary:
         st.markdown(f"""
         <div class="insight-box">
-            <strong>Week {week} Spend:</strong> ${total_week_cost:,} (${WEEKLY_BURN} fixed + ${total_channel_cost} channels)<br>
-            <strong>Budget after this week:</strong> ${remaining_after:,}<br>
-            <strong>Channels active:</strong> {len(selected_channels)}
+            <strong>Week {week} spend:</strong> ${total_week_cost:,.0f} (${WEEKLY_BURN} fixed + ${total_channel_spend:,.0f} channels)<br>
+            <strong>Budget after this week:</strong> ${remaining_after:,.0f}<br>
+            <strong>Channels active:</strong> {active_count}
         </div>
         """, unsafe_allow_html=True)
 
@@ -1148,14 +1353,14 @@ def render_weekly_play():
         st.markdown("")
         can_proceed = remaining_after >= 0
         if not can_proceed:
-            st.error("Over budget! Deselect some channels.")
+            st.error("Over budget! Lower some spend.")
 
         if st.button(
             f"Run Week {week} ▶️",
             key=f"btn_run_week_{week}",
-            disabled=not can_proceed or len(selected_channels) == 0,
+            disabled=not can_proceed or active_count == 0,
         ):
-            run_week(selected_channels, total_week_cost)
+            run_week(spend_by_channel, total_week_cost)
             st.rerun()
 
     # Option to pivot strategy
@@ -1185,26 +1390,30 @@ def render_weekly_play():
                 st.rerun()
 
 
-def run_week(selected_channels, total_cost):
-    """Execute one week of simulation."""
+def run_week(spend_by_channel, total_cost):
+    """Execute one week of simulation given per-channel spend dict."""
     ss = st.session_state
 
-    result = simulate_week(selected_channels)
+    result = simulate_week(spend_by_channel)
     # Apply weekly cashflow: subtract all costs, add gross profit from sales (revenue * margin).
     # This models profit reinvestment — successful launches build a bigger budget.
     ss.budget -= total_cost
     ss.budget += result["revenue"] * result["margin"]
     ss.total_sales += result["sales"] + result["repeat_sales"]
     ss.total_revenue += result["revenue"]
-    ss.total_ad_spend += total_cost - WEEKLY_BURN
+    ss.total_ad_spend += result.get("ad_spend", total_cost - WEEKLY_BURN)
     ss.total_leads += result["total_leads"]
     ss.email_list += result["email_signups"]
     ss.repeat_customers += result["repeat_sales"]
     if result["revenue"] > ss.best_week_revenue:
         ss.best_week_revenue = result["revenue"]
 
+    # Record spend allocation for the week
+    ss.spend_by_channel[ss.week] = dict(spend_by_channel)
+
     # Update channel history
-    for ch in selected_channels:
+    active_channels = [k for k, v in spend_by_channel.items() if v > 0]
+    for ch in active_channels:
         if ch not in ss.channel_history:
             ss.channel_history[ch] = []
         ss.channel_history[ch].append(ss.week)
@@ -1319,7 +1528,7 @@ def render_results():
     </div>
     """, unsafe_allow_html=True)
 
-    # Summary metrics
+    # Summary metrics — headline
     c1, c2, c3, c4 = st.columns(4)
     with c1:
         render_metric_card("Total Customers", ss.total_sales, "#6C4BEF")
@@ -1331,6 +1540,40 @@ def render_results():
     with c4:
         render_metric_card("Email List", ss.email_list, "#F59E0B")
 
+    # Unit economics — the real measure of a launch
+    price = calculate_effective_price()
+    pricing = get_pricing() or {"margin": 0.5}
+    margin = pricing.get("margin", 0.5) * ss.margin_modifier
+    cm_per_unit = price * margin
+    ltv = cm_per_unit * 3.0  # 3x-equivalent (repeat + referral)
+    cac_now = get_cac()
+    ltv_cac = (ltv / cac_now) if cac_now > 0 else 0
+    payback = (cac_now / cm_per_unit) if cm_per_unit > 0 and cac_now > 0 else 0
+
+    st.markdown("##### 📐 Unit Economics")
+    uc1, uc2, uc3, uc4 = st.columns(4)
+    with uc1:
+        render_metric_card("Price (effective)", f"${price:,.0f}", "#1F2937")
+    with uc2:
+        render_metric_card("Contribution $ / sale", f"${cm_per_unit:,.0f}", "#1F2937")
+    with uc3:
+        ratio_color = "#10B981" if ltv_cac >= 3 else "#F59E0B" if ltv_cac >= 1 else "#EF4444"
+        render_metric_card("LTV : CAC", f"{ltv_cac:.1f} : 1" if ltv_cac > 0 else "—", ratio_color)
+    with uc4:
+        pb_color = "#10B981" if 0 < payback < 12 else "#F59E0B" if payback < 18 else "#EF4444"
+        render_metric_card("Payback (months)", f"{payback:.1f}" if payback > 0 else "—", pb_color)
+
+    # Unit-econ verdict
+    if ltv_cac >= 3 and payback < 12:
+        verdict = "🟢 **Healthy unit economics** — LTV:CAC ≥ 3 and payback under 12 months. This is the zone where growth actually creates value."
+    elif ltv_cac >= 1.5:
+        verdict = "🟡 **Fragile unit economics** — you are making marginal money per customer, but not enough buffer to absorb shocks or fund growth."
+    elif cac_now > 0:
+        verdict = "🔴 **Negative unit economics** — each customer costs more than they return. Fix CAC (targeting, channel mix) or price/margin before scaling."
+    else:
+        verdict = "⚫ **Not enough customers to compute unit economics.** You did not reach a sample size to learn from."
+    st.markdown(f"<div class='insight-box'>{verdict}</div>", unsafe_allow_html=True)
+
     st.markdown("")
 
     # Score calculation
@@ -1338,15 +1581,17 @@ def render_results():
         m["points"] for m in active_milestones() if m["name"] in ss.milestones_hit
     )
     efficiency_score = 0
-    if ss.total_sales > 0:
-        cac = get_cac()
-        price = calculate_effective_price()
-        pricing = get_pricing()
-        margin_per_unit = price * pricing.get("margin", 0.5) * ss.margin_modifier
-        if margin_per_unit > cac:
+    if ss.total_sales > 0 and cac_now > 0:
+        # Score on LTV:CAC ratio — the universal unit-econ benchmark
+        if ltv_cac >= 3:
             efficiency_score = 20
-        elif margin_per_unit > cac * 0.7:
-            efficiency_score = 10
+        elif ltv_cac >= 2:
+            efficiency_score = 14
+        elif ltv_cac >= 1:
+            efficiency_score = 7
+        # Payback bonus
+        if 0 < payback < 12:
+            efficiency_score += 5
 
     diversity_score = min(15, len(ss.channels_ever_used) * 3)
     adaptability_score = min(10, len(ss.event_responses) * 3)
